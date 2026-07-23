@@ -1,0 +1,71 @@
+id = "usagebar"
+name = "Herdr Usage Bar"
+version = "0.1.0"
+# Configurable sidebar rows and metadata tokens landed in Herdr 0.7.4.
+min_herdr_version = "0.7.4"
+description = "Sidebar context meters, provider limit windows, rate-limit toasts, and a thin bottom usage bar"
+platforms = ["macos", "linux"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["bash", "bin/run-status.sh"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["bash", "bin/run-notify.sh"]
+
+[[events]]
+on = "pane.focused"
+command = ["bash", "bin/run-status.sh"]
+
+[[events]]
+on = "pane.focused"
+command = ["bash", "bin/run-update-check.sh", "--auto"]
+
+[[actions]]
+id = "refresh"
+title = "Refresh usage status"
+contexts = ["workspace", "pane"]
+command = ["bash", "bin/run-status.sh"]
+
+[[actions]]
+id = "open-limits"
+title = "Open Herdr Usage Bar pane"
+contexts = ["workspace", "pane"]
+command = ["bash", "bin/open-limits-pane.sh"]
+
+[[actions]]
+id = "open-statusbar"
+title = "Open bottom usage bar"
+contexts = ["workspace", "pane"]
+command = ["bash", "bin/open-statusbar-pane.sh"]
+
+[[actions]]
+id = "setup"
+title = "Setup Herdr Usage Bar (show config snippets)"
+contexts = ["workspace", "pane"]
+command = ["bash", "bin/run-setup.sh"]
+
+[[actions]]
+id = "enable-toast"
+title = "Enable Herdr toast delivery (safe append)"
+contexts = ["workspace", "pane"]
+command = ["bash", "bin/run-setup.sh", "--write-toast"]
+
+[[actions]]
+id = "check-updates"
+title = "Check for Herdr Usage Bar updates"
+contexts = ["workspace", "pane"]
+command = ["bash", "bin/run-update-check.sh"]
+
+[[panes]]
+id = "limits"
+title = "Herdr Usage Bar"
+placement = "split"
+command = ["bash", "bin/run-limits-pane.sh"]
+
+[[panes]]
+id = "statusbar"
+title = "Herdr Usage Bar"
+placement = "split"
+command = ["bash", "bin/run-statusbar-pane.sh", "--all"]
