@@ -10,8 +10,6 @@ Monitor context usage and provider rate limits for agents running in [Herdr](htt
 
 This project also adds a compact usage bar in a thin bottom pane.
 
-![Herdr Usage Bar pane showing Claude, Codex, OpenCode Go, and Grok subscription limits alongside a pay-as-you-go API spend block (DeepSeek shown as one example), with per-pane activity shares](docs/assets/agent-usage-pane.png)
-
 - **Bottom usage bar** — a thin split at the bottom of the active tab shows provider usage percentages and reset countdowns, refreshed every 15 seconds.
 - **Per-pane context meters** — every agent pane's sidebar label shows how much of its context window the session is using (`⛁ 13% (130k)` = 130k tokens, 13% of the window), updated after each completed turn.
 - **Provider limit row** — a separate sidebar row shows the shortest account-limit window (`5h 72%`) without crowding the context meter.
