@@ -181,7 +181,7 @@ func AppendToastConfigIfMissing(configPath string) AppendToastResult {
 		return AppendToastResult{Reason: "could not create temporary Herdr config: " + err.Error()}
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 	if err := tmp.Chmod(fileMode); err != nil {
 		_ = tmp.Close()
 		return AppendToastResult{Reason: "could not set Herdr config permissions: " + err.Error()}
