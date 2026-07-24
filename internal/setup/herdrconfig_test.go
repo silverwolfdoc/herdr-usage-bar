@@ -71,6 +71,14 @@ func TestAppendToastConfigIfMissing_Preserves(t *testing.T) {
 	}
 }
 
+func TestAppendToastConfigIfMissing_ReadErrorDoesNotClaimWrite(t *testing.T) {
+	dir := t.TempDir()
+	r := AppendToastConfigIfMissing(dir)
+	if r.Wrote || !strings.Contains(r.Reason, "could not read Herdr config") {
+		t.Fatalf("got %+v", r)
+	}
+}
+
 func TestToastConfigSnippet(t *testing.T) {
 	s := ToastConfigSnippet()
 	if !strings.Contains(s, "[ui.toast]") || !strings.Contains(s, "delivery") {

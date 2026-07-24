@@ -20,7 +20,7 @@ type ToastDeliveryStatus struct {
 
 // ResolveHerdrConfigPath returns ~/.config/herdr/config.toml (or overrides).
 func ResolveHerdrConfigPath(env map[string]string) string {
-	if fromEnv := env["HERDR_CONFIG"]; fromEnv != "" {
+	if fromEnv := env["HERDR_CONFIG_PATH"]; fromEnv != "" {
 		return fromEnv
 	}
 	if xdg := env["XDG_CONFIG_HOME"]; xdg != "" {
@@ -140,7 +140,9 @@ type AppendToastResult struct {
 // AppendToastConfigIfMissing appends toast section only when missing.
 func AppendToastConfigIfMissing(configPath string) AppendToastResult {
 	dir := filepath.Dir(configPath)
-	_ = os.MkdirAll(dir, 0o755)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return AppendToastResult{Reason: "could not create Herdr config directory: " + err.Error()}
+	}
 
 	raw := ""
 	if b, err := os.ReadFile(configPath); err == nil {
@@ -152,6 +154,15 @@ func AppendToastConfigIfMissing(configPath string) AppendToastResult {
 			}
 			return AppendToastResult{Wrote: false, Reason: "toast section already present"}
 		}
+	} else if !os.IsNotExist(err) {
+		return AppendToastResult{Reason: "could not read Herdr config: " + err.Error()}
+	}
+
+	fileMode := os.FileMode(0o644)
+	if info, err := os.Stat(configPath); err == nil {
+		fileMode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return AppendToastResult{Reason: "could not inspect Herdr config: " + err.Error()}
 	}
 
 	base := raw
@@ -163,6 +174,27 @@ func AppendToastConfigIfMissing(configPath string) AppendToastResult {
 		spacer = "\n"
 	}
 	block := spacer + "# --- added by Herdr Usage Bar (usagebar) setup ---\n" + ToastConfigSnippet()
-	_ = os.WriteFile(configPath, []byte(base+block), 0o644)
+	content := []byte(base + block)
+
+	tmp, err := os.CreateTemp(dir, ".herdr-usage-bar-config-*")
+	if err != nil {
+		return AppendToastResult{Reason: "could not create temporary Herdr config: " + err.Error()}
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(fileMode); err != nil {
+		_ = tmp.Close()
+		return AppendToastResult{Reason: "could not set Herdr config permissions: " + err.Error()}
+	}
+	if _, err := tmp.Write(content); err != nil {
+		_ = tmp.Close()
+		return AppendToastResult{Reason: "could not write Herdr config: " + err.Error()}
+	}
+	if err := tmp.Close(); err != nil {
+		return AppendToastResult{Reason: "could not close Herdr config: " + err.Error()}
+	}
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		return AppendToastResult{Reason: "could not install Herdr config: " + err.Error()}
+	}
 	return AppendToastResult{Wrote: true, Reason: "appended toast config to " + configPath}
 }

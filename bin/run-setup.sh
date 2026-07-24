@@ -9,6 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 REPO="silverwolfdoc/herdr-usage-bar"
+VERSION="$(awk -F '"' '/^version = / { print $2; exit }' "$ROOT/herdr-plugin.toml")"
+RELEASE_TAG="v$VERSION"
 
 # Normalize uname output to the Go GOOS/GOARCH names used by release assets
 # (.github/workflows/release.yml): usagebar-<os>-<arch>.
@@ -37,16 +39,21 @@ download_release_binary() {
   # curl covers public repos without gh installed.
   if command -v gh >/dev/null 2>&1; then
     echo "usagebar: downloading prebuilt binary ($asset) via gh..." >&2
-    gh release download --repo "$REPO" --pattern "$asset" -O "$tmp" 2>/dev/null || rm -f "$tmp"
+    gh release download "$RELEASE_TAG" --repo "$REPO" --pattern "$asset" -O "$tmp" 2>/dev/null || rm -f "$tmp"
   fi
   if [[ ! -s "$tmp" ]] && command -v curl >/dev/null 2>&1; then
     echo "usagebar: downloading prebuilt binary ($asset) via curl..." >&2
-    curl -fsSL "https://github.com/$REPO/releases/latest/download/$asset" -o "$tmp" || rm -f "$tmp"
+    curl -fsSL "https://github.com/$REPO/releases/download/$RELEASE_TAG/$asset" -o "$tmp" || rm -f "$tmp"
   fi
   [[ -s "$tmp" ]] || return 1
   chmod +x "$tmp"
-  # Sanity check before installing: the binary must run on this machine.
-  "$tmp" version >/dev/null 2>&1 || { rm -f "$tmp"; return 1; }
+  # Sanity check before installing: the binary must run on this machine and
+  # match this checkout's manifest version.
+  [[ "$("$tmp" version 2>/dev/null)" == "usagebar $RELEASE_TAG" ]] || {
+    echo "usagebar: release binary version does not match $RELEASE_TAG" >&2
+    rm -f "$tmp"
+    return 1
+  }
   mv -f "$tmp" "$dest"
 }
 

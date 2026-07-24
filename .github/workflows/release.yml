@@ -9,18 +9,31 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
           # Match CI: use the latest supported Go 1.25 patch release.
           go-version: '1.25'
+
+      - name: Verify release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          manifest_version="$(awk -F '"' '/^version = / { print $2; exit }' herdr-plugin.toml)"
+          expected_version="${RELEASE_TAG#v}"
+          test "$manifest_version" = "$expected_version"
+          git fetch --no-tags origin main --depth=1
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)"
 
       - name: Vet
         run: go vet ./...
@@ -50,8 +63,12 @@ jobs:
   build:
     needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:

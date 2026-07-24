@@ -1,6 +1,6 @@
 id = "usagebar"
 name = "Herdr Usage Bar"
-version = "0.1.0"
+version = "0.1.1"
 # Configurable sidebar rows and metadata tokens landed in Herdr 0.7.4.
 min_herdr_version = "0.7.4"
 description = "Sidebar context meters, provider limit windows, rate-limit toasts, and a thin bottom usage bar"

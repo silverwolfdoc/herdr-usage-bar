@@ -21,6 +21,7 @@ This project also adds a compact usage bar in a thin bottom pane.
 
 - **Herdr ≥ 0.7.4**
 - **macOS or Linux**
+- **Bash** (plugin entrypoints use Bash)
 - Agent integrations for reliable session matching (recommended):
 
 ```bash
@@ -228,7 +229,7 @@ For Claude 5h / 7d windows and toasts, pipe the status line through this plugin.
 {
   "statusLine": {
     "type": "command",
-    "command": "bash /path/to/herdr-usage-bar/bin/run-statusline.sh"
+    "command": "bash '/path/to/herdr-usage-bar/bin/run-statusline.sh'"
   }
 }
 ```

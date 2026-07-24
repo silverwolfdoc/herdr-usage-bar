@@ -22,7 +22,7 @@ Follow every step in order. Do not skip confirmation gates.
    - `ctrl+shift+m` → `usagebar.refresh`
 
    Before writing any binding, inspect `~/.config/herdr/config.toml` (or
-   `$HERDR_CONFIG` / `$XDG_CONFIG_HOME/herdr/config.toml`) for existing
+   `$HERDR_CONFIG_PATH` / `$XDG_CONFIG_HOME/herdr/config.toml`) for existing
    `[[keys.command]]` entries.
    - If **either** recommended key is already used by another command, **stop
      and ask** the user which key(s) to use for the free action(s). Do not
@@ -146,7 +146,7 @@ Read the active Herdr config first. The target Agent layout is:
 row_gap = 0
 rows = [
   ["state_icon", "tab", "pane"],
-  ["agent", "$limit"],
+  ["$provider", "$limit"],
   ["$context"],
 ]
 ```
@@ -218,7 +218,7 @@ command = "usagebar.refresh"
 description = "Herdr Usage Bar: refresh sidebar meters"
 ```
 
-6. After any keybinding change:
+After any keybinding change:
 
 ```bash
 herdr server reload-config

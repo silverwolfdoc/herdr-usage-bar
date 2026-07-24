@@ -21,7 +21,7 @@ func TestRunSetup_SeedsAndSnippets(t *testing.T) {
 		WriteToast: false,
 		Env: map[string]string{
 			"HERDR_PLUGIN_CONFIG_DIR": pluginDir,
-			"HERDR_CONFIG":            herdrConfig,
+			"HERDR_CONFIG_PATH":       herdrConfig,
 			"HERDR_PLUGIN_ROOT":       "/tmp/plugin-root",
 		},
 	})
@@ -52,7 +52,7 @@ func TestRunSetup_WriteToast(t *testing.T) {
 		WriteToast: true,
 		Env: map[string]string{
 			"HERDR_PLUGIN_CONFIG_DIR": pluginDir,
-			"HERDR_CONFIG":            herdrConfig,
+			"HERDR_CONFIG_PATH":       herdrConfig,
 		},
 	})
 	if !report.ToastWrote {
@@ -60,5 +60,18 @@ func TestRunSetup_WriteToast(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(report.Lines, "\n"), "appended toast config") {
 		t.Fatal("missing append message")
+	}
+}
+
+func TestRunSetup_QuotesStatusLinePath(t *testing.T) {
+	pluginDir := t.TempDir()
+	report := RunSetup(SetupOptions{Env: map[string]string{
+		"HERDR_PLUGIN_CONFIG_DIR": pluginDir,
+		"HERDR_PLUGIN_ROOT":       "/tmp/plugin root",
+	}})
+	text := strings.Join(report.Lines, "\n")
+	want := `"command": "bash '/tmp/plugin root/bin/run-statusline.sh'"`
+	if !strings.Contains(text, want) {
+		t.Fatalf("missing quoted command %q in:\n%s", want, text)
 	}
 }

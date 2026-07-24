@@ -9,6 +9,7 @@ package setup
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -109,13 +110,18 @@ func RunSetup(options SetupOptions) SetupReport {
 	if root == "" {
 		root = "/path/to/herdr-usage-bar"
 	}
+	statusLineCommand := "bash " + shellQuote(root+"/bin/run-statusline.sh")
 	lines = append(lines,
 		"Claude statusLine (optional, for CC rate windows):",
-		`  "command": "bash `+root+`/bin/run-statusline.sh"`,
+		`  "command": `+strconv.Quote(statusLineCommand),
 		"",
 	)
 
 	return SetupReport{Lines: lines, PluginConfigSeeded: seeded, ToastWrote: toastWrote}
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
 func envFromOS() map[string]string {

@@ -63,7 +63,7 @@ func TestBaseName(t *testing.T) {
 }
 
 func TestSameProjectArchiveRename(t *testing.T) {
-	if !SameProject("/Users/x/herdr-usagebar", "/Users/y/herdr-usagebar-ts-archived") {
+	if !SameProject("/Users/x/usage-bar", "/Users/y/usage-bar-archived") {
 		t.Fatal("archive rename")
 	}
 	if SameProject("/Users/x/app", "/Users/y/apple") {
