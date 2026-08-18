@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -101,4 +102,47 @@ func contains(s, sub string) bool {
 			}
 			return false
 		}())
+}
+
+func TestParsePluginConfigTOMLCodexProfiles(t *testing.T) {
+	cfg := ParsePluginConfigTOML(`
+[[codex.profiles]]
+id = "almir"
+label = "Codex almir"
+codex_home = "/home/u/.codex-almir"
+
+[[codex.profiles]]
+id = "vvs"
+codex_home = "/home/u/.codex-vvs"
+`)
+	if len(cfg.CodexProfiles) != 2 {
+		t.Fatalf("want 2 codex profiles, got %d", len(cfg.CodexProfiles))
+	}
+	if cfg.CodexProfiles[0].ID != "almir" || cfg.CodexProfiles[0].Label != "Codex almir" ||
+		cfg.CodexProfiles[0].CodexHome != "/home/u/.codex-almir" {
+		t.Fatalf("first profile mis-decoded: %+v", cfg.CodexProfiles[0])
+	}
+	if cfg.CodexProfiles[1].Label != "" {
+		t.Fatalf("absent label must stay empty for downstream id fallback, got %q", cfg.CodexProfiles[1].Label)
+	}
+}
+
+func TestParsePluginConfigTOMLWithoutCodexSectionStaysEmpty(t *testing.T) {
+	cfg := ParsePluginConfigTOML("[notify]\nenabled = true\n")
+	if len(cfg.CodexProfiles) != 0 {
+		t.Fatalf("no [[codex.profiles]] must yield none (implicit default downstream), got %+v", cfg.CodexProfiles)
+	}
+}
+
+func TestDefaultPluginConfigTOMLDocumentsCodexProfiles(t *testing.T) {
+	body := DefaultPluginConfigTOML(DefaultPluginConfig)
+	for _, want := range []string{"[[codex.profiles]]", "codex_home"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("seed config must document %q", want)
+		}
+	}
+	// The seed must stay commented out, or seeding would configure accounts.
+	if strings.Contains(body, "\n[[codex.profiles]]") {
+		t.Fatal("codex profile example must be commented out in the seed")
+	}
 }

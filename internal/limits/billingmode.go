@@ -40,7 +40,7 @@ const (
 // provider universe (matches collect.go). Claude's portion is dynamic — see
 // BillingDeps.ClaudeProfileIDs — since a multi-profile setup's billing gate
 // must consider each configured account independently.
-var nonClaudeProviderIDs = []string{"codex", "opencode", "grok"}
+var nonClaudeProviderIDs = []string{"opencode", "grok"}
 
 // CombineBillingModes merges account- and session-level evidence.
 // PayAsYouGo wins (positive evidence to hide), then Subscription.
@@ -173,6 +173,9 @@ type BillingDeps struct {
 	// universe so each configured account is gated independently. Empty
 	// defaults to ["claude"] (today's single-profile behavior).
 	ClaudeProfileIDs []string
+	// CodexProfileIDs does the same for Codex accounts. Empty defaults to
+	// ["codex"] (today's single-account behavior).
+	CodexProfileIDs []string
 }
 
 // PaneBillingMode combines account- and session-level evidence for one pane.
@@ -198,8 +201,13 @@ func BillingProviderFilter(openPanes []OpenPaneSnapshot, paneQueryOK bool, deps 
 	if len(claudeIDs) == 0 {
 		claudeIDs = []string{"claude"}
 	}
-	allIDs := make([]string, 0, len(claudeIDs)+len(nonClaudeProviderIDs))
+	codexIDs := deps.CodexProfileIDs
+	if len(codexIDs) == 0 {
+		codexIDs = []string{"codex"}
+	}
+	allIDs := make([]string, 0, len(claudeIDs)+len(codexIDs)+len(nonClaudeProviderIDs))
 	allIDs = append(allIDs, claudeIDs...)
+	allIDs = append(allIDs, codexIDs...)
 	allIDs = append(allIDs, nonClaudeProviderIDs...)
 
 	byProvider := make(map[string][]OpenPaneSnapshot)

@@ -24,13 +24,21 @@ func ActiveProviderFilter(openPanes []OpenPaneSnapshot, paneQueryOK bool) map[st
 // A Claude pane (any account) activates every configured Claude profile id —
 // not just the one that pane happens to belong to — so the panel can show all
 // configured accounts side by side for comparison, per the issue's request.
+// Codex panes do the same across configured Codex accounts: without it, a
+// renamed profile id (e.g. "codex-vvs") matches no agent and the whole Codex
+// block silently vanishes from the panel.
 func ActiveProviderSet(openPanes []OpenPaneSnapshot) map[string]bool {
 	set := make(map[string]bool)
 	hasClaudePane := false
+	hasCodexPane := false
 	for _, pane := range openPanes {
 		agent := strings.ToLower(pane.Agent)
 		if agent == "claude" {
 			hasClaudePane = true
+			continue
+		}
+		if agent == "codex" {
+			hasCodexPane = true
 			continue
 		}
 		if providerID, ok := agentToProvider[agent]; ok {
@@ -39,6 +47,11 @@ func ActiveProviderSet(openPanes []OpenPaneSnapshot) map[string]bool {
 	}
 	if hasClaudePane {
 		for _, p := range ResolvedClaudeProfiles() {
+			set[p.ID] = true
+		}
+	}
+	if hasCodexPane {
+		for _, p := range ResolvedCodexProfiles() {
 			set[p.ID] = true
 		}
 	}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/claude"
+	"github.com/silverwolfdoc/herdr-usage-bar/internal/codex"
 )
 
 // DefaultRemainingThresholds are the toast remaining-% buckets.
@@ -29,6 +30,9 @@ type PluginConfig struct {
 	// ClaudeProfiles are the configured [[claude.profiles]] entries (unresolved).
 	// Empty means the single implicit "claude" profile is synthesized downstream.
 	ClaudeProfiles []claude.ProfileSpec
+	// CodexProfiles are the configured [[codex.profiles]] entries (unresolved).
+	// Empty means the single implicit "codex" profile is synthesized downstream.
+	CodexProfiles []codex.ProfileSpec
 }
 
 // DefaultPluginConfig is the seed default.
@@ -46,6 +50,9 @@ type pluginConfigWire struct {
 	Claude struct {
 		Profiles []profileWire `toml:"profiles"`
 	} `toml:"claude"`
+	Codex struct {
+		Profiles []codexProfileWire `toml:"profiles"`
+	} `toml:"codex"`
 }
 
 type profileWire struct {
@@ -53,6 +60,12 @@ type profileWire struct {
 	Label          string `toml:"label"`
 	ConfigDir      string `toml:"config_dir"`
 	ClaudeJSONPath string `toml:"claude_json_path"`
+}
+
+type codexProfileWire struct {
+	ID        string `toml:"id"`
+	Label     string `toml:"label"`
+	CodexHome string `toml:"codex_home"`
 }
 
 // ResolvePluginConfigDir resolves the config directory.
@@ -111,6 +124,20 @@ func DefaultPluginConfigTOML(config PluginConfig) string {
 		"# label = \"Claude (secondary)\"",
 		"# config_dir = \"/home/you/.claude-secondary\"",
 		"",
+		"# Multi-account Codex: uncomment and add one block per CODEX_HOME.",
+		"# Absence of any profile keeps the single default account (CODEX_HOME",
+		"# else ~/.codex), fully backward compatible. codex_home must be unique.",
+		"#",
+		"# [[codex.profiles]]",
+		"# id = \"codex\"",
+		"# label = \"Codex\"",
+		"# codex_home = \"/home/you/.codex\"",
+		"#",
+		"# [[codex.profiles]]",
+		"# id = \"codex-secondary\"",
+		"# label = \"Codex (secondary)\"",
+		"# codex_home = \"/home/you/.codex-secondary\"",
+		"",
 	}, "\n")
 }
 
@@ -155,6 +182,13 @@ func ParsePluginConfigTOML(raw string) PluginConfig {
 			JSONPath:  p.ClaudeJSONPath,
 		})
 	}
+	for _, p := range wire.Codex.Profiles {
+		cfg.CodexProfiles = append(cfg.CodexProfiles, codex.ProfileSpec{
+			ID:        p.ID,
+			Label:     p.Label,
+			CodexHome: p.CodexHome,
+		})
+	}
 	return cfg
 }
 
@@ -177,6 +211,16 @@ func ResolveClaudeProfiles(env map[string]string) []claude.ClaudeProfile {
 	cfg := LoadPluginConfig(ResolvePluginConfigDir(env))
 	home, _ := os.UserHomeDir()
 	return claude.ResolveProfiles(cfg.ClaudeProfiles, env, home)
+}
+
+// ResolveCodexProfiles loads the plugin config and resolves its
+// [[codex.profiles]] into concrete profiles (synthesizing the single implicit
+// default when none are configured). Shared by the limits collector and the
+// per-pane rollout resolver.
+func ResolveCodexProfiles(env map[string]string) []codex.CodexProfile {
+	cfg := LoadPluginConfig(ResolvePluginConfigDir(env))
+	home, _ := os.UserHomeDir()
+	return codex.ResolveProfiles(cfg.CodexProfiles, env, home)
 }
 
 // LoadPluginConfig loads config.toml or returns defaults.

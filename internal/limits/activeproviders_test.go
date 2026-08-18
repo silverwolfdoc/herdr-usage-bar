@@ -10,9 +10,9 @@ import (
 )
 
 // isolatePluginConfig points HERDR_PLUGIN_CONFIG_DIR at an empty temp dir so
-// ResolvedClaudeProfiles() (invoked whenever a claude pane is present) always
-// synthesizes the single default profile here, regardless of the machine
-// running the test.
+// ResolvedClaudeProfiles()/ResolvedCodexProfiles() (invoked whenever a claude
+// or codex pane is present) always synthesize the single default profile here,
+// regardless of the machine running the test.
 func isolatePluginConfig(t *testing.T) {
 	t.Helper()
 	t.Setenv("HERDR_PLUGIN_CONFIG_DIR", t.TempDir())
@@ -42,6 +42,7 @@ func TestActiveProviderSet_EmptyPanes(t *testing.T) {
 }
 
 func TestActiveProviderSet_IgnoresUnknownAgents(t *testing.T) {
+	isolatePluginConfig(t)
 	panes := []OpenPaneSnapshot{
 		{PaneID: "w1:p1", Agent: ""},
 		{PaneID: "w1:p2", Agent: "shell"},

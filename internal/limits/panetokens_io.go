@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/claude"
+	codexprofile "github.com/silverwolfdoc/herdr-usage-bar/internal/codex"
 	claudeprovider "github.com/silverwolfdoc/herdr-usage-bar/internal/providers/claude"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/providers/codex"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/providers/grok"
@@ -27,12 +28,13 @@ func DefaultPaneActivityDeps() PaneActivityDeps {
 	// the resolver and the token/total dispatch each re-resolving (which could
 	// also skew if config changed mid-pass).
 	profiles := ResolvedClaudeProfiles()
+	codexProfiles := ResolvedCodexProfiles()
 	return PaneActivityDeps{
 		TokensForPane: func(providerID string, pane OpenPaneSnapshot, startMs, endMs int64) float64 {
-			return tokensForPaneWith(profiles, providerID, pane, startMs, endMs)
+			return tokensForPaneWith2(profiles, codexProfiles, providerID, pane, startMs, endMs)
 		},
 		TotalTokensForProvider: func(providerID string, startMs, endMs int64) float64 {
-			return totalTokensForProviderWith(profiles, providerID, startMs, endMs)
+			return totalTokensForProviderWith2(profiles, codexProfiles, providerID, startMs, endMs)
 		},
 		ResolvePaneProvider: BuildClaudePaneProviderResolver(profiles),
 	}
@@ -85,8 +87,19 @@ func TokensForPaneDefault(providerID string, pane OpenPaneSnapshot, startMs, end
 // profile snapshot (see DefaultPaneActivityDeps): Claude ids resolve their
 // transcript root from profiles, other agents via the static switch.
 func tokensForPaneWith(profiles []claude.ClaudeProfile, providerID string, pane OpenPaneSnapshot, startMs, endMs int64) float64 {
+	return tokensForPaneWith2(profiles, nil, providerID, pane, startMs, endMs)
+}
+
+// tokensForPaneWith2 additionally recognizes configured Codex account ids, which
+// no longer equal the literal "codex" once [[codex.profiles]] is configured.
+func tokensForPaneWith2(profiles []claude.ClaudeProfile, codexProfiles []codexprofile.CodexProfile, providerID string, pane OpenPaneSnapshot, startMs, endMs int64) float64 {
 	if profile, ok := profileByIDIn(profiles, providerID); ok {
 		return claudeTokensForPaneIn(profile.ProjectsRoot, pane, startMs, endMs)
+	}
+	if codexprofile.IsCodexProviderID(providerID, codexProfiles) {
+		// The pane's own rollout is found across every configured home by the
+		// resolver, so the pane's tokens need no per-account scoping here.
+		return codexTokensForPane(pane, startMs, endMs)
 	}
 	switch providerID {
 	case "codex":
@@ -152,8 +165,20 @@ func TotalTokensForProviderDefault(providerID string, startMs, endMs int64) floa
 // totalTokensForProviderWith is TotalTokensForProviderDefault dispatched against
 // an explicit profile snapshot (see DefaultPaneActivityDeps).
 func totalTokensForProviderWith(profiles []claude.ClaudeProfile, providerID string, startMs, endMs int64) float64 {
+	return totalTokensForProviderWith2(profiles, nil, providerID, startMs, endMs)
+}
+
+// totalTokensForProviderWith2 scopes a Codex account's denominator to that
+// account's own sessions root. Summing every configured home would inflate the
+// denominator and silently shrink each pane's reported share.
+func totalTokensForProviderWith2(profiles []claude.ClaudeProfile, codexProfiles []codexprofile.CodexProfile, providerID string, startMs, endMs int64) float64 {
 	if profile, ok := profileByIDIn(profiles, providerID); ok {
 		return claudeTotalIn(profile.ProjectsRoot, startMs, endMs)
+	}
+	for _, cp := range codexProfiles {
+		if cp.ID == providerID {
+			return codexTotalIn(cp.SessionsRoot, startMs, endMs)
+		}
 	}
 	switch providerID {
 	case "codex":
@@ -362,8 +387,12 @@ func claudeTotalIn(root string, startMs, endMs int64) float64 {
 }
 
 func codexTotal(startMs, endMs int64) float64 {
+	return codexTotalIn(filepath.Join(codexHome(), "sessions"), startMs, endMs)
+}
+
+func codexTotalIn(sessionsRoot string, startMs, endMs int64) float64 {
 	var sum float64
-	for _, path := range ListNewestRolloutPaths(10_000) {
+	for _, path := range ListNewestRolloutPathsIn(sessionsRoot, 10_000) {
 		lines := readIfTouchedInWindow(path, startMs)
 		if lines == nil {
 			continue
