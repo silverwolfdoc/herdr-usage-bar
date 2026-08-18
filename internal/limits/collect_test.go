@@ -34,12 +34,15 @@ func TestCollectAllProviderLimits_WithCollectorsAndAttach(t *testing.T) {
 				return ProviderLimits{ProviderID: "claude", Label: "Claude", Source: "test", FetchedAtMs: now}
 			},
 		}},
-		Codex: func(c *string, now int64) ProviderLimits {
-			if c == nil || *c != "/tmp" {
-				t.Fatal("cwd not passed")
-			}
-			return ProviderLimits{ProviderID: "codex", Label: "Codex", Source: "test", FetchedAtMs: now}
-		},
+		Codex: []CodexProfileCollector{{
+			ID: "codex", Label: "Codex",
+			Collector: func(c *string, now int64) ProviderLimits {
+				if c == nil || *c != "/tmp" {
+					t.Fatal("cwd not passed")
+				}
+				return ProviderLimits{ProviderID: "codex", Label: "Codex", Source: "test", FetchedAtMs: now}
+			},
+		}},
 		Attach: func(providers []ProviderLimits, nowMs int64) []ProviderLimits {
 			if nowMs != 200 || len(providers) != 4 {
 				t.Fatalf("attach args")
@@ -79,10 +82,13 @@ func TestCollectAllProviderLimits_OnlySkipsFilteredCollectors(t *testing.T) {
 	codexCalled := false
 	got := CollectAllProviderLimits(nil, 100, CollectOptions{
 		Only: map[string]bool{"claude": true},
-		Codex: func(_ *string, now int64) ProviderLimits {
-			codexCalled = true
-			return ProviderLimits{ProviderID: "codex", Label: "Codex", Source: "test", FetchedAtMs: now}
-		},
+		Codex: []CodexProfileCollector{{
+			ID: "codex", Label: "Codex",
+			Collector: func(_ *string, now int64) ProviderLimits {
+				codexCalled = true
+				return ProviderLimits{ProviderID: "codex", Label: "Codex", Source: "test", FetchedAtMs: now}
+			},
+		}},
 		Attach: func(providers []ProviderLimits, _ int64) []ProviderLimits {
 			if len(providers) != 1 {
 				t.Fatalf("attach got %d providers, want 1 (filtered)", len(providers))

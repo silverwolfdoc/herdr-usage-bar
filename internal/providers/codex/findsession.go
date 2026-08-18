@@ -34,13 +34,40 @@ func sessionsRoot() string {
 	return filepath.Join(codexHome(), "sessions")
 }
 
+// SessionsRootsOverride, when non-empty, replaces the single implicit sessions
+// root with every configured account's root. Set once at process start by the
+// caller that can read the plugin config (internal/limits), so this leaf
+// package stays free of a config dependency and its import cycle.
+var SessionsRootsOverride []string
+
+// sessionsRoots returns every root to search: the configured accounts when set,
+// else the single implicit CODEX_HOME-else-~/.codex root.
+func sessionsRoots() []string {
+	if len(SessionsRootsOverride) > 0 {
+		return SessionsRootsOverride
+	}
+	return []string{sessionsRoot()}
+}
+
 type rolloutCandidate struct {
 	path    string
 	mtimeMs int64
 }
 
+// listRolloutCandidates scans every configured account's sessions root, so a
+// pane is found regardless of which CODEX_HOME its session was started under.
+// Results are merged and sorted by mtime, keeping the newest-first contract the
+// callers rely on.
 func listRolloutCandidates() []rolloutCandidate {
-	root := sessionsRoot()
+	var all []rolloutCandidate
+	for _, root := range sessionsRoots() {
+		all = append(all, listRolloutCandidatesIn(root)...)
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].mtimeMs > all[j].mtimeMs })
+	return all
+}
+
+func listRolloutCandidatesIn(root string) []rolloutCandidate {
 	var matches []rolloutCandidate
 	years, err := os.ReadDir(root)
 	if err != nil {

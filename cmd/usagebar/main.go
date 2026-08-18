@@ -15,6 +15,7 @@ import (
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/claude"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/herdrcli"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/limits"
+	codexprovider "github.com/silverwolfdoc/herdr-usage-bar/internal/providers/codex"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/ratelimit"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/setup"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/update"
@@ -27,6 +28,11 @@ var version = "0.1.0-dev"
 
 func main() {
 	limits.SetShowNotification(herdrcli.ShowNotification)
+	// Point the per-pane Codex rollout resolver at every configured account, so
+	// a pane's context meter is found regardless of which CODEX_HOME started
+	// it. Wired here rather than inside providers/codex to keep that leaf
+	// package free of a config dependency (and the resulting import cycle).
+	codexprovider.SessionsRootsOverride = limits.CodexSessionsRoots()
 
 	if len(os.Args) < 2 {
 		printUsage(os.Stderr)

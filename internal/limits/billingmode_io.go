@@ -35,14 +35,30 @@ func DefaultBillingDeps() BillingDeps {
 	for i, p := range profiles {
 		ids[i] = p.ID
 	}
+	codexProfiles := ResolvedCodexProfiles()
+	codexIDs := make([]string, len(codexProfiles))
+	for i, p := range codexProfiles {
+		codexIDs[i] = p.ID
+	}
+	// A configured Codex account id is not the literal "codex", so the billing
+	// dispatch must recognize it or every such account gates as Unknown.
+	normalizeCodex := func(providerID string) string {
+		for _, id := range codexIDs {
+			if id == providerID {
+				return "codex"
+			}
+		}
+		return providerID
+	}
 	return BillingDeps{
 		PaneMode: func(providerID string, pane OpenPaneSnapshot) BillingMode {
-			return paneBillingModeWith(profiles, providerID, pane)
+			return paneBillingModeWith(profiles, normalizeCodex(providerID), pane)
 		},
 		AccountMode: func(providerID string) BillingMode {
-			return accountBillingModeWith(profiles, providerID)
+			return accountBillingModeWith(profiles, normalizeCodex(providerID))
 		},
 		ClaudeProfileIDs: ids,
+		CodexProfileIDs:  codexIDs,
 	}
 }
 

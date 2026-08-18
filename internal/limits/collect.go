@@ -17,14 +17,26 @@ type ClaudeProfileCollector struct {
 	Collector LimitsCollector
 }
 
+// CodexProfileCollector is one configured Codex account's collector, keyed by
+// that profile's own provider id/label so multiple accounts collect and display
+// independently instead of sharing the single literal "codex" id.
+type CodexProfileCollector struct {
+	ID        string
+	Label     string
+	Collector LimitsCollector
+}
+
 // CollectOptions configures CollectAllProviderLimits.
 type CollectOptions struct {
 	// Claude is one entry per configured Claude profile, in config order. Empty
 	// synthesizes a single "claude" stub spec, matching how the other
 	// providers behave when left unconfigured (mainly relevant to tests that
 	// build CollectOptions directly rather than via DefaultCollectOptions).
-	Claude   []ClaudeProfileCollector
-	Codex    LimitsCollector
+	Claude []ClaudeProfileCollector
+	// Codex is one entry per configured Codex account, in config order. Empty
+	// synthesizes a single "codex" stub spec, matching Claude's behaviour and
+	// how the other providers behave when left unconfigured.
+	Codex    []CodexProfileCollector
 	OpenCode LimitsCollector
 	Grok     LimitsCollector
 	// Attach activity after collection (injectable for tests).
@@ -59,9 +71,25 @@ func DefaultCollectOptions() CollectOptions {
 			},
 		}
 	}
+	codexProfiles := ResolvedCodexProfiles()
+	multiCodex := len(codexProfiles) > 1
+	codexCollectors := make([]CodexProfileCollector, len(codexProfiles))
+	for i, p := range codexProfiles {
+		codexCollectors[i] = CodexProfileCollector{
+			ID:    p.ID,
+			Label: p.Label,
+			Collector: func(_ *string, nowMs int64) ProviderLimits {
+				// When 2+ accounts are configured, every row nests under one
+				// shared "Codex" group in the panel, labeled by its real
+				// logged-in email rather than the profile's own label — so
+				// the account behind each row is always verifiable.
+				return applyCodexProfileGrouping(CollectCodexLimitsForProfile(p, nowMs), p, multiCodex)
+			},
+		}
+	}
 	return CollectOptions{
 		Claude: claudeCollectors,
-		Codex:  CollectCodexLimits,
+		Codex:  codexCollectors,
 		OpenCode: func(_ *string, nowMs int64) ProviderLimits {
 			return CollectOpenCodeLimits(nowMs, "")
 		},
@@ -72,7 +100,8 @@ func DefaultCollectOptions() CollectOptions {
 }
 
 // CollectAllProviderLimits runs collectors in display order: each configured
-// Claude profile (config order) -> Codex -> OpenCode -> Grok, then attaches
+// Claude profile (config order) -> each configured Codex account (config
+// order) -> OpenCode -> Grok, then attaches
 // pane activity when configured. Providers excluded by opts.Only are skipped
 // (collectors never run). Pass DefaultCollectOptions() for production local
 // collectors.
@@ -95,8 +124,19 @@ func CollectAllProviderLimits(cwd *string, nowMs int64, opts CollectOptions) []P
 		claudeSpecs = []ClaudeProfileCollector{{ID: "claude", Label: "Claude"}}
 	}
 
-	base := make([]ProviderLimits, 0, len(claudeSpecs)+3)
+	base := make([]ProviderLimits, 0, len(claudeSpecs)+len(opts.Codex)+3)
 	for _, s := range claudeSpecs {
+		if opts.Only != nil && !opts.Only[s.ID] {
+			continue
+		}
+		base = append(base, collect(s.Collector, s.ID, s.Label))
+	}
+
+	codexSpecs := opts.Codex
+	if len(codexSpecs) == 0 {
+		codexSpecs = []CodexProfileCollector{{ID: "codex", Label: "Codex"}}
+	}
+	for _, s := range codexSpecs {
 		if opts.Only != nil && !opts.Only[s.ID] {
 			continue
 		}
@@ -107,7 +147,6 @@ func CollectAllProviderLimits(cwd *string, nowMs int64, opts CollectOptions) []P
 		collector LimitsCollector
 		id, label string
 	}{
-		{opts.Codex, "codex", "Codex"},
 		{opts.OpenCode, "opencode", "OpenCode"},
 		{opts.Grok, "grok", "Grok"},
 	}

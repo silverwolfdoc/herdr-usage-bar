@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	codexprofile "github.com/silverwolfdoc/herdr-usage-bar/internal/codex"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/fsutil"
 	"github.com/silverwolfdoc/herdr-usage-bar/internal/planlabels"
 )
@@ -106,9 +107,15 @@ func isFiniteF(n float64) bool {
 	return !math.IsNaN(n) && !math.IsInf(n, 0)
 }
 
-// ListNewestRolloutPaths returns up to max rollout paths by mtime desc.
+// ListNewestRolloutPaths returns up to max rollout paths by mtime desc, from
+// the implicit default account's sessions root.
 func ListNewestRolloutPaths(max int) []string {
-	root := filepath.Join(codexHome(), "sessions")
+	return ListNewestRolloutPathsIn(filepath.Join(codexHome(), "sessions"), max)
+}
+
+// ListNewestRolloutPathsIn returns up to max rollout paths by mtime desc under
+// one account's sessions root.
+func ListNewestRolloutPathsIn(root string, max int) []string {
 	var matches []struct {
 		path    string
 		mtimeMs int64
@@ -184,6 +191,18 @@ func codexHome() string {
 	return filepath.Join(home, ".codex")
 }
 
+// CollectCodexLimitsForProfile reads one configured account's rate-limit
+// windows from the freshest rollout snapshot under that account's own sessions
+// root. Rate limits are account-wide, so scoping the scan to the account's
+// CODEX_HOME is what keeps two configured accounts from reporting each other's
+// numbers — the single-account assumption CollectCodexLimits documents.
+func CollectCodexLimitsForProfile(p codexprofile.CodexProfile, nowMs int64) ProviderLimits {
+	pl := collectCodexLimitsFrom(p.SessionsRoot, nowMs)
+	pl.ProviderID = p.ID
+	pl.Label = p.Label
+	return pl
+}
+
 // CollectCodexLimits reads the account-global Codex rate-limit windows from the
 // freshest rollout snapshot across ALL sessions.
 //
@@ -197,9 +216,13 @@ func codexHome() string {
 // (~/.codex is single-auth); with multiple accounts this reports whichever
 // session turned most recently.
 func CollectCodexLimits(_ *string, nowMs int64) ProviderLimits {
-	paths := ListNewestRolloutPaths(codexMaxRolloutsToScan)
+	return collectCodexLimitsFrom(filepath.Join(codexHome(), "sessions"), nowMs)
+}
+
+func collectCodexLimitsFrom(sessionsRoot string, nowMs int64) ProviderLimits {
+	paths := ListNewestRolloutPathsIn(sessionsRoot, codexMaxRolloutsToScan)
 	if len(paths) == 0 {
-		note := "no rollout jsonl under ~/.codex/sessions"
+		note := "no rollout jsonl under " + sessionsRoot
 		return ProviderLimits{ProviderID: "codex", Label: "Codex", Source: "none", FetchedAtMs: nowMs, Note: &note}
 	}
 	// Newest-first: take the first rollout that carries a rate_limits snapshot.
